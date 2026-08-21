@@ -1,0 +1,12 @@
+streamlit
+langchain
+langchain-community
+langgraph
+chromadb
+sentence-transformers
+jsonlines
+python-dotenv
+zhipuai
+torch
+torchvision
+python-dotenv
