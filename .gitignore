@@ -1,0 +1,5 @@
+.env 
+db/ 
+models/ 
+__pycache__/ 
+*.zip 
