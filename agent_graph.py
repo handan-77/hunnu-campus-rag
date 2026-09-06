@@ -12,6 +12,13 @@ from skills_tools import query_scholarship, query_discipline, get_policy_time
 
 load_dotenv()
 api_key = os.getenv("ZHIPU_API_KEY")
+# Streamlit 云端部署兜底：环境变量缺失时从 st.secrets 读取
+if not api_key:
+    try:
+        import streamlit as _st
+        api_key = _st.secrets.get("ZHIPU_API_KEY")
+    except Exception:
+        pass
 
 model = ChatZhipuAI(
     model="glm-4-flash",
