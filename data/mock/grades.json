@@ -1,0 +1,16 @@
+{
+  "term": "2025-2026 第二学期",
+  "avg": 88.5,
+  "gpa": 3.86,
+  "rank": "12/126",
+  "items": [
+    {"course": "高等数学（上）", "type": "必修", "credit": 4, "score": 92, "gpa": 4.0},
+    {"course": "大学英语（三）", "type": "必修", "credit": 3, "score": 87, "gpa": 3.7},
+    {"course": "数据结构", "type": "必修", "credit": 4, "score": 90, "gpa": 3.9},
+    {"course": "马克思主义基本原理", "type": "必修", "credit": 3, "score": 85, "gpa": 3.5},
+    {"course": "Python 程序设计", "type": "选修", "credit": 2, "score": 95, "gpa": 4.0},
+    {"course": "网页设计与制作", "type": "选修", "credit": 2, "score": 89, "gpa": 3.8},
+    {"course": "大学物理（二）", "type": "必修", "credit": 3, "score": 81, "gpa": 3.1},
+    {"course": "影视鉴赏", "type": "选修", "credit": 1, "score": 93, "gpa": 4.0}
+  ]
+}

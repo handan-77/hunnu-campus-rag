@@ -1,17 +1,20 @@
+import os
 import jsonlines
 import chromadb
 from sentence_transformers import SentenceTransformer
 
 # -------------------------- 全局配置（无需修改） --------------------------
 LOCAL_BGE_PATH = "./models/bge-m3"
+# 云端部署（无本地模型目录）时自动从 HuggingFace Hub 下载 BAAI/bge-m3
+MODEL_PATH = LOCAL_BGE_PATH if os.path.isdir(LOCAL_BGE_PATH) else "BAAI/bge-m3"
 INPUT_VECTOR_FILE = "rag_output/chunk_with_vector.jsonl"
 CHROMA_DB_PATH = "./db"
 COLLECTION_NAME = "hunnu_school_knowledge"
 SIM_THRESHOLD = 0.0  # 低于该相似度直接过滤
 
-# 仅加载离线BGE，用于手动编码查询文本
-print("加载本地BGE-M3嵌入模型...")
-bge_model = SentenceTransformer(LOCAL_BGE_PATH)
+# 加载 BGE 嵌入模型（本地离线优先，云端自动下载）
+print(f"加载 BGE-M3 嵌入模型（{MODEL_PATH}）...")
+bge_model = SentenceTransformer(MODEL_PATH)
 
 # 初始化向量库客户端，指定余弦距离空间
 client = chromadb.PersistentClient(path=CHROMA_DB_PATH)
@@ -91,7 +94,8 @@ def search_test(query: str, top_k: int = 5):
         results.append({
             "content": docs[idx],
             "title": metas[idx]["title"],
-            "score": cos_sim
+            "score": cos_sim,
+            "source_url": metas[idx].get("source_url", "")  # 官网原文链接（溯源跳转用）
         })
     
     print(f"   → 找到 {len(results)} 条高匹配结果")

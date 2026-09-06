@@ -1,5 +1,9 @@
-.env 
-db/ 
-models/ 
-__pycache__/ 
-*.zip 
+.env
+.streamlit/secrets.toml
+models/
+__pycache__/
+*.zip
+# 用户聊天记录（运行时自动生成，不入库）
+data/chat_store/
+# 旧向量库目录（应用使用 ./db）
+rag_vector_db/

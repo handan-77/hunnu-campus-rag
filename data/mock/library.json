@@ -1,0 +1,13 @@
+{
+  "loans": [
+    {"title": "深入理解计算机系统", "author": "Randal E. Bryant", "borrow": "2026-08-20", "due": "2026-10-20", "status": "在借"},
+    {"title": "机器学习（西瓜书）", "author": "周志华", "borrow": "2026-08-28", "due": "2026-10-28", "status": "在借"},
+    {"title": "三体（全三册）", "author": "刘慈欣", "borrow": "2026-09-01", "due": "2026-10-01", "status": "在借"}
+  ],
+  "search": [
+    {"title": "机器学习", "author": "周志华", "loc": "图书馆 3 楼 TP181/Z42", "avail": "可借 2 册"},
+    {"title": "深度学习", "author": "Ian Goodfellow", "loc": "图书馆 3 楼 TP183/G25", "avail": "可借 1 册"},
+    {"title": "算法导论", "author": "Thomas H. Cormen", "loc": "图书馆 3 楼 TP301.5/C33", "avail": "已借完（可预约）"},
+    {"title": "围城", "author": "钱钟书", "loc": "图书馆 4 楼 I246.5/Q41", "avail": "可借 3 册"}
+  ]
+}
