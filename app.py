@@ -593,7 +593,7 @@ def _process(prompt):
 
 # ========== 对话区增强脚本（事件委托绑定在父页面 document 上，重渲染不失效） ==========
 # 1) 语音输入；2) 新消息/切换会话后自动滚到底部；3) 导出当前会话为 Markdown 下载
-# 提问提交由内嵌原生 <form method=GET target=_top> 完成，无需 JS 导航
+# 提问提交由内嵌原生 <form method=GET> 完成，无需 JS 导航
 # 所有链接/表单都在 Python 端自动带 uid，JS 完全不碰 URL（避免 iframe 跨域导航安全拦截）
 _MIC_SCRIPT_TPL = """
 <script>
@@ -613,9 +613,9 @@ _MIC_SCRIPT_TPL = """
   var SR = window.parent.SpeechRecognition || window.parent.webkitSpeechRecognition;
   d.addEventListener('click', function (e) {
     // —— 完全不拦截任何链接和表单 ——
-    // form 提交（target=_top）、a 链接点击都由浏览器原生处理
+    // form GET 提交、a 链接点击都由浏览器原生处理（st.markdown 渲染在主文档，非 iframe）
     // 之前拦截后用 window.parent.location.href 导航会触发：
-    // "Unsafe attempt to initiate navigation for frame" 安全错误
+    // "Unsafe attempt to initiate navigation for frame" sandbox 安全错误
     var mic = e.target && e.target.closest ? e.target.closest('#micBtn') : null;
     if (mic) {
       var box = d.getElementById('askBox');
@@ -686,7 +686,7 @@ def _sess_list_html():
         star = '<span class="pin-mark">📌</span>' if s["id"] in pinned_ids else ""
         if ss.get("ren_sid") == s["id"]:
             return (f'<div class="sess-row{on} is-ren">'
-                    f'<form class="ren-form" method="GET" action="/" target="_top" autocomplete="off">'
+                    f'<form class="ren-form" method="GET" action="/" autocomplete="off">'
                     f'<input type="hidden" name="view" value="AI对话">'
                     f'<input type="hidden" name="uid" value="{ss.get("user_id", "")}">'
                     f'<input type="hidden" name="rsid" value="{s["id"]}">'
@@ -819,7 +819,7 @@ def page_chat():
     ts_now = int(datetime.now(_CST).timestamp() * 1000)
     msgs.append(
         '<div class="in-row">'
-        '<form id="askForm" method="GET" action="/" target="_top" autocomplete="off">'
+        '<form id="askForm" method="GET" action="/" autocomplete="off">'
         '<input type="hidden" name="view" value="AI对话">'
         f'<input type="hidden" name="uid" value="{ss.get("user_id", "")}">'
         f'<input type="hidden" name="ts" value="{ts_now}">'
