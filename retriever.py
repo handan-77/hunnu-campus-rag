@@ -4,16 +4,17 @@ import chromadb
 from sentence_transformers import SentenceTransformer
 
 # -------------------------- 全局配置（无需修改） --------------------------
-LOCAL_BGE_PATH = "./models/bge-m3"
-# 云端部署（无本地模型目录）时自动从 HuggingFace Hub 下载 BAAI/bge-m3
-MODEL_PATH = LOCAL_BGE_PATH if os.path.isdir(LOCAL_BGE_PATH) else "BAAI/bge-m3"
+# 轻量级多语言模型（支持中文，384 维，体积小、云端部署快）
+LOCAL_MODEL_PATH = "./models/paraphrase-multilingual-MiniLM-L12-v2"
+# 云端部署（无本地模型目录）时自动从 HuggingFace Hub 下载
+MODEL_PATH = LOCAL_MODEL_PATH if os.path.isdir(LOCAL_MODEL_PATH) else "sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2"
 INPUT_VECTOR_FILE = "rag_output/chunk_with_vector.jsonl"
 CHROMA_DB_PATH = "./db"
 COLLECTION_NAME = "hunnu_school_knowledge"
 SIM_THRESHOLD = 0.0  # 低于该相似度直接过滤
 
-# 加载 BGE 嵌入模型（本地离线优先，云端自动下载）
-print(f"加载 BGE-M3 嵌入模型（{MODEL_PATH}）...")
+# 加载嵌入模型（本地离线优先，云端自动下载）
+print(f"加载嵌入模型 paraphrase-multilingual-MiniLM-L12-v2（{MODEL_PATH}）...")
 bge_model = SentenceTransformer(MODEL_PATH)
 
 # 初始化向量库客户端，指定余弦距离空间
