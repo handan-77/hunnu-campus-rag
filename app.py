@@ -29,7 +29,7 @@ import services
 import store
 
 # ========== 页面配置（校徽仅读取本地文件，禁止AI生成） ==========
-_BADGE_CANDIDATES = ["hunnu_logo.png", "logo(1).jpg", "logo.jpg", "hnu_emblem.png"]
+_BADGE_CANDIDATES = ["new_badge_clean.png", "hunnu_logo.png", "logo(1).jpg", "logo.jpg", "hnu_emblem.png"]
 _BADGE = next((os.path.join(ROOT, n) for n in _BADGE_CANDIDATES if os.path.exists(os.path.join(ROOT, n))), None)
 st.set_page_config(
     page_title="校园智能助手 · 湖南师范大学",
@@ -189,9 +189,8 @@ st.markdown("""
         background: #C8102E; box-shadow: 0 2px 8px rgba(158,13,38,.28);
         display: flex; align-items: center; justify-content: space-between; padding: 0 26px;}
     .hdr-left {display: flex; align-items: center;}
-    .m-badge {width: 46px; height: 46px; border-radius: 50%; background: #fff;
-        display: flex; align-items: center; justify-content: center; margin-right: 12px;}
-    .m-badge img {width: 38px; height: 38px; object-fit: contain; border-radius: 50%;}
+    .m-badge {height: 44px; display: flex; align-items: center; margin-right: 14px;}
+    .m-badge img {height: 44px; width: auto; object-fit: contain;}
     .m-title {font-family: 'Zhi Mang Xing', 'Ma Shan Zheng', 'STXingkai', '华文行楷', 'KaiTi', '楷体', serif;
         font-size: 29px; font-weight: 400; color: #fff; letter-spacing: 4px;}
     .hdr-sub {color: rgba(255,255,255,.78); font-size: 12px; margin-left: 10px; letter-spacing: 1px;}
@@ -473,7 +472,7 @@ def render_header(v):
         f'<div class="m-header">'
         f'<div class="hdr-left">'
         f'<span class="m-badge"><img src="data:{_BADGE_MIME};base64,{_BADGE_B64}" alt="校徽"></span>'
-        f'<span class="m-title">{title}</span>{sub_html}'
+        f'{sub_html}'
         f'</div>'
         f'{center_html}'
         f'<div class="hdr-right">{right}</div>'
