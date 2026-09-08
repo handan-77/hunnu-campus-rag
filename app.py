@@ -66,8 +66,13 @@ if ss["user_id"] is None:
     else:
         # 首次访问 → 自动生成匿名 UUID（12 位十六进制，短且足够唯一）
         ss["user_id"] = _uuid.uuid4().hex[:12]
-# uid 同步到 URL：不用 qp setter（会触发 Streamlit URL 重写清掉其他参数），
-# 改由 JS 在客户端 window.history.replaceState 同步
+        # 首次访问时用 qp setter 把 uid 写入 URL（此时没有操作参数，不会被覆盖）
+        try:
+            qp["uid"] = ss["user_id"]
+        except Exception:
+            pass
+# 之后的 uid 保留全靠 url() 函数自动附加 + 表单 hidden input，
+# 再也不用 qp setter（Streamlit URL 重写机制会清掉 pin/del/ask 等操作参数）
 
 # ========== 会话状态 / 持久化存储（user_id 隔离） ==========
 if "store" not in ss:
@@ -504,8 +509,7 @@ def render_header(v):
         f'</div>'
         f'{center_html}'
         f'<div class="hdr-right">{right}</div>'
-        f'</div>'
-        f'<script>(function(){{try{{var u=new URL(location.href);if(!u.searchParams.has("uid")&&"{ss.get("user_id","")}"){{u.searchParams.set("uid","{ss.get("user_id","")}");history.replaceState(null,"",u.toString());}}}}catch(e){{}}}})();</script>',
+        f'</div>',
         unsafe_allow_html=True)
 
 
@@ -590,22 +594,14 @@ def _process(prompt):
 # ========== 对话区增强脚本（事件委托绑定在父页面 document 上，重渲染不失效） ==========
 # 1) 语音输入；2) 新消息/切换会话后自动滚到底部；3) 导出当前会话为 Markdown 下载
 # 提问提交由内嵌原生 <form method=GET target=_top> 完成，无需 JS 导航
+# 所有链接/表单都在 Python 端自动带 uid，JS 完全不碰 URL（避免 iframe 跨域导航安全拦截）
 _MIC_SCRIPT_TPL = """
 <script>
 (function () {
+  // 注意：这个脚本跑在 components.html 创建的隐藏 iframe 里
+  // Streamlit 内部有嵌套 iframe 结构，window.parent.location 导航会被浏览器安全策略拦截
+  // 所以这里只做：语音输入、自动滚动、导出——所有 URL 导航都交给原生 HTML（form/a）
   var d = window.parent.document;
-  var uid = '__UID__';
-  // 每次页面渲染完，用 replaceState 确保 URL 带 uid（不用 qp setter 避免 Streamlit 清其他参数）
-  // 关键：只在 URL 没有 uid 时才添加，绝不修改其他参数！
-  (function syncUid() {
-    try {
-      var url = new URL(window.parent.location.href);
-      if (!url.searchParams.has('uid') && uid) {
-        url.searchParams.set('uid', uid);
-        window.parent.history.replaceState(null, '', url.toString());
-      }
-    } catch(e) {}
-  })();
   // 标志挂在 document 上（与监听器同生命周期）：页面导航/框架重建后自动重新绑定，
   // Streamlit 重渲染（document 不变）时防重复绑定
   if (d.__delegatedBound) {
@@ -616,26 +612,10 @@ _MIC_SCRIPT_TPL = """
   var rec = null;
   var SR = window.parent.SpeechRecognition || window.parent.webkitSpeechRecognition;
   d.addEventListener('click', function (e) {
-    // —— 不拦截任何链接 ——
-    // Streamlit 能正确处理 ?view=xxx 导航，
-    // 操作类参数（pin/del/ren/nts/ask）也能通过 URL 参数正常处理
-    // 拦截反而导致导航失效
-    var a = e.target && e.target.closest ? e.target.closest('a[href]') : null;
-    if (a) {
-      var h = a.getAttribute('href') || '';
-      if (h && h.startsWith('/?')) {
-        // 唯一需要特殊处理的：iframe 内的快捷指令/输入行链接
-        // 它们的 target 是 _top，默认行为会新开标签
-        // 只有这些才拦截
-        var inChatArea = e.target && e.target.closest(
-          '.chip-row, .in-row');
-        if (inChatArea) {
-          e.preventDefault();
-          window.parent.location.href = h;
-          return;
-        }
-      }
-    }
+    // —— 完全不拦截任何链接和表单 ——
+    // form 提交（target=_top）、a 链接点击都由浏览器原生处理
+    // 之前拦截后用 window.parent.location.href 导航会触发：
+    // "Unsafe attempt to initiate navigation for frame" 安全错误
     var mic = e.target && e.target.closest ? e.target.closest('#micBtn') : null;
     if (mic) {
       var box = d.getElementById('askBox');
