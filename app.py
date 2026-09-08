@@ -54,38 +54,24 @@ def _now(fmt="%Y-%m-%d %H:%M"):
 # ========== 读取 URL 参数（交互路由） ==========
 qp = st.query_params
 
-# ========== 多用户登录 ==========
+# ========== 自动生成访客会话 ID（首次访问无感知分配，跨导航/刷新通过 URL 保持） ==========
+import uuid as _uuid
 ss = st.session_state
-# 登录态：优先 session_state，其次 URL 参数（跨导航持久化）
 ss.setdefault("user_id", None)
 _url_uid = qp.get("uid")
-if ss["user_id"] is None and _url_uid and _url_uid != ss.get("_last_url_uid"):
-    ss["user_id"] = _url_uid
-    ss["store"] = store.load(_url_uid)
-    ss["_last_url_uid"] = _url_uid
-
-# 把 user_id 同步到 URL（跨导航保留登录态）—— 在 st.stop() 之前执行
-if ss["user_id"] and qp.get("uid") != ss["user_id"]:
+if ss["user_id"] is None:
+    if _url_uid:
+        # URL 带 uid → 恢复已有会话
+        ss["user_id"] = _url_uid
+    else:
+        # 首次访问 → 自动生成匿名 UUID（12 位十六进制，短且足够唯一）
+        ss["user_id"] = _uuid.uuid4().hex[:12]
+# 把 user_id 同步到 URL（跨导航保留会话）
+if qp.get("uid") != ss["user_id"]:
     try:
         qp["uid"] = ss["user_id"]
     except Exception:
         pass
-
-if ss["user_id"] is None:
-    # 首次进入或已退出 → 显示登录入口
-    st.markdown('<div style="text-align:center; padding:60px 20px;">'
-                '<h2 style="color:#C8102E;">🎓 湖南师范大学 · 校园智能助手</h2>'
-                '<p style="color:#616161;">请先登录，不同用户数据独立保存</p>'
-                '</div>', unsafe_allow_html=True)
-    with st.form("login_form", border=False):
-        _uid = st.text_input("输入学号 / 用户名", placeholder="如：2023010301 或 handan-77",
-                             key="login_input")
-        if st.form_submit_button("进入 →", use_container_width=True, type="primary"):
-            ss["user_id"] = (_uid or "guest").strip()
-            ss["store"] = store.load(ss["user_id"])
-            ss["_last_url_uid"] = ss["user_id"]
-            st.rerun()
-    st.stop()
 
 # ========== 会话状态 / 持久化存储（user_id 隔离） ==========
 if "store" not in ss:
@@ -590,14 +576,14 @@ _MIC_SCRIPT = """
   var rec = null;
   var SR = window.parent.SpeechRecognition || window.parent.webkitSpeechRecognition;
   d.addEventListener('click', function (e) {
-    // —— 拦截操作类链接：用 replaceState 导航，不产生浏览器历史记录 ——
+    // —— 拦截所有内部操作链接：preventDefault + location.replace（零历史、零新标签） ——
     var a = e.target && e.target.closest ? e.target.closest('a[href]') : null;
-    if (a && a.closest('.chat-wrap, .sess-card, .panel-card')) {
+    if (a) {
       var h = a.getAttribute('href') || '';
       if (h && h.startsWith('/?')) {
         e.preventDefault();
-        window.parent.history.replaceState(null, '', h);
-        window.parent.location.href = h;  // 触发 Streamlit rerun（replaceState 不会）
+        // location.replace 不产生浏览器历史记录，比 location.href = 更干净
+        window.parent.location.replace(h);
         return;
       }
     }
