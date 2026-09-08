@@ -576,14 +576,19 @@ _MIC_SCRIPT = """
   var rec = null;
   var SR = window.parent.SpeechRecognition || window.parent.webkitSpeechRecognition;
   d.addEventListener('click', function (e) {
-    // —— 拦截所有内部操作链接：preventDefault + location.replace（零历史、零新标签） ——
+    // —— 内部链接拦截：区分页面级导航 vs 操作类交互 ——
     var a = e.target && e.target.closest ? e.target.closest('a[href]') : null;
     if (a) {
       var h = a.getAttribute('href') || '';
       if (h && h.startsWith('/?')) {
         e.preventDefault();
-        // location.replace 不产生浏览器历史记录，比 location.href = 更干净
-        window.parent.location.replace(h);
+        // 包含 view 参数 → 页面级导航，产生历史记录（返回键有用）
+        // 不包含 view 参数 → 操作类交互（置顶/删会话/切换会话等），零历史
+        if (h.indexOf('view=') !== -1) {
+          window.parent.location.href = h;   // 产生历史
+        } else {
+          window.parent.location.replace(h); // 零历史
+        }
         return;
       }
     }
