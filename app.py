@@ -14,7 +14,7 @@ import os
 import re
 import sys
 import html as _h
-import time
+from datetime import datetime, timezone, timedelta
 from urllib.parse import quote, unquote_plus
 
 ROOT = os.path.dirname(os.path.abspath(__file__))
@@ -46,17 +46,57 @@ def _b64(path):
 _BADGE_B64 = _b64(_BADGE) if _BADGE else ""
 _BADGE_MIME = "image/png" if (_BADGE and _BADGE.endswith(".png")) else "image/jpeg"
 
-# ========== 会话状态 / 持久化存储 ==========
+# 北京时间（UTC+8）——云端服务器时区独立于用户，所有时间统一显示北京时间
+_CST = timezone(timedelta(hours=8))
+def _now(fmt="%Y-%m-%d %H:%M"):
+    return datetime.now(_CST).strftime(fmt)
+
+# ========== 读取 URL 参数（交互路由） ==========
+qp = st.query_params
+
+# ========== 多用户登录 ==========
 ss = st.session_state
-ss.setdefault("user_id", "default")            # 多用户登录预留：登录后替换为真实 uid
+# 登录态：优先 session_state，其次 URL 参数（跨导航持久化）
+ss.setdefault("user_id", None)
+_url_uid = qp.get("uid")
+if ss["user_id"] is None and _url_uid and _url_uid != ss.get("_last_url_uid"):
+    ss["user_id"] = _url_uid
+    ss["store"] = store.load(_url_uid)
+    ss["_last_url_uid"] = _url_uid
+
+# 把 user_id 同步到 URL（跨导航保留登录态）—— 在 st.stop() 之前执行
+if ss["user_id"] and qp.get("uid") != ss["user_id"]:
+    try:
+        qp["uid"] = ss["user_id"]
+    except Exception:
+        pass
+
+if ss["user_id"] is None:
+    # 首次进入或已退出 → 显示登录入口
+    st.markdown('<div style="text-align:center; padding:60px 20px;">'
+                '<h2 style="color:#C8102E;">🎓 湖南师范大学 · 校园智能助手</h2>'
+                '<p style="color:#616161;">请先登录，不同用户数据独立保存</p>'
+                '</div>', unsafe_allow_html=True)
+    with st.form("login_form", border=False):
+        _uid = st.text_input("输入学号 / 用户名", placeholder="如：2023010301 或 handan-77",
+                             key="login_input")
+        if st.form_submit_button("进入 →", use_container_width=True, type="primary"):
+            ss["user_id"] = (_uid or "guest").strip()
+            ss["store"] = store.load(ss["user_id"])
+            ss["_last_url_uid"] = ss["user_id"]
+            st.rerun()
+    st.stop()
+
+# ========== 会话状态 / 持久化存储（user_id 隔离） ==========
 if "store" not in ss:
-    ss["store"] = store.load(ss["user_id"])    # {"profile","records","favorites","sessions"}
+    ss["store"] = store.load(ss["user_id"])
 ss.setdefault("cur_sid", ss["store"]["sessions"][-1]["id"])
 ss.setdefault("deep_think", False)             # 深度思考：扩大检索范围(5→8)
 ss.setdefault("chat_error", None)
 ss.setdefault("last_ask", None)
 ss.setdefault("last_nts", None)
 ss.setdefault("_logout_toast", False)
+ss.setdefault("_logout_key", 0)                 # 登出按钮触发计数器
 
 VIEWS = ["首页", "AI对话", "校园服务", "个人中心"]
 
@@ -71,8 +111,6 @@ def _cur():
     return s
 
 
-# ========== 读取 URL 参数（交互路由） ==========
-qp = st.query_params
 view = unquote_plus(qp.get("view", "首页"))
 if view not in VIEWS:
     view = "首页"
@@ -213,11 +251,24 @@ st.markdown("""
     .tile svg {display: block; margin: 0 auto;}
     .tile .name {font-size: 13.5px; margin-top: 9px; color: #141414;}
 
-    /* ===== 对话页（左侧资料+会话，右侧对话；全屏通栏） ===== */
+    /* ===== 对话页（左右独立滚动，互不影响） ===== */
     .chat-wrap {display: flex; gap: 18px; align-items: stretch;
         max-width: 1320px; margin: 0 auto; width: 100%;
-        padding: 20px 26px 34px; min-height: calc(100vh - 64px); box-sizing: border-box;}
-    .panel-col {flex: 28; min-width: 270px; display: flex; flex-direction: column; gap: 16px;}
+        padding: 20px 26px 34px; height: calc(100vh - 64px); box-sizing: border-box;
+        overflow: hidden;}
+    /* 左栏：sticky 独立滚动（聊天记录+检索资料一起滚） */
+    .panel-col {flex: 28; min-width: 270px; display: flex; flex-direction: column; gap: 16px;
+        position: sticky; top: 12px; height: calc(100vh - 88px); overflow-y: auto;
+        scrollbar-width: thin; scrollbar-color: #d0d5dd transparent;}
+    .panel-col::-webkit-scrollbar {width: 6px;}
+    .panel-col::-webkit-scrollbar-thumb {background: #d0d5dd; border-radius: 3px;}
+    /* 右栏：独立滚动 */
+    .chat-card {flex: 72; padding: 18px 20px 14px; display: flex; flex-direction: column;
+        height: calc(100vh - 88px); overflow: hidden;}
+    .chat-card .chat-body {flex: 1; overflow-y: auto; scrollbar-width: thin;
+        scrollbar-color: #d0d5dd transparent;}
+    .chat-card .chat-body::-webkit-scrollbar {width: 6px;}
+    .chat-card .chat-body::-webkit-scrollbar-thumb {background: #d0d5dd; border-radius: 3px;}
     .panel-card {flex: 1;}
     details.panel-fold {padding: 0;}
     details.panel-fold > summary {list-style: none; cursor: pointer; padding: 14px 16px;}
@@ -228,7 +279,6 @@ st.markdown("""
     .fold-arrow {margin-left: 8px; color: #9aa1ab; font-size: 12px; transition: transform .15s;
         flex-shrink: 0;}
     details.panel-fold[open] .fold-arrow {transform: rotate(180deg);}
-    .chat-card {flex: 72; padding: 18px 20px 14px; display: flex; flex-direction: column;}
     .panel-head {display: flex; align-items: center; justify-content: space-between;}
     .panel-title {font-size: 15.5px; font-weight: 700; color: #141414;}
     .panel-pill {background: #C8102E; color: #fff; font-size: 11.5px; padding: 3px 10px;
@@ -540,6 +590,17 @@ _MIC_SCRIPT = """
   var rec = null;
   var SR = window.parent.SpeechRecognition || window.parent.webkitSpeechRecognition;
   d.addEventListener('click', function (e) {
+    // —— 拦截操作类链接：用 replaceState 导航，不产生浏览器历史记录 ——
+    var a = e.target && e.target.closest ? e.target.closest('a[href]') : null;
+    if (a && a.closest('.chat-wrap, .sess-card, .panel-card')) {
+      var h = a.getAttribute('href') || '';
+      if (h && h.startsWith('/?')) {
+        e.preventDefault();
+        window.parent.history.replaceState(null, '', h);
+        window.parent.location.href = h;  // 触发 Streamlit rerun（replaceState 不会）
+        return;
+      }
+    }
     var mic = e.target && e.target.closest ? e.target.closest('#micBtn') : null;
     if (mic) {
       var box = d.getElementById('askBox');
@@ -597,8 +658,8 @@ CHIP_PROMPTS = [("查课表", "请帮我查询本学期的课表安排。"),
 
 # ========== 会话列表（按日期分组，区分不同会话） ==========
 def _sess_list_html():
-    today = time.strftime("%Y-%m-%d")
-    ts = int(time.time() * 1000)
+    today = _now("%Y-%m-%d")
+    ts = int(datetime.now(_CST).timestamp() * 1000)
     sessions = sorted(ss["store"]["sessions"], key=lambda x: x["created"], reverse=True)
     pinned_ids = ss["store"].get("pinned", [])
     pinned = [s for s in sessions if s["id"] in pinned_ids]
@@ -646,7 +707,7 @@ def _sess_list_html():
 def _sess_md(sess):
     """当前会话 → Markdown 文本（导出用）"""
     lines = [f"# {sess.get('title', '对话记录')}",
-             f"> 导出时间：{time.strftime('%Y-%m-%d %H:%M')}　消息数：{len(sess.get('messages', []))}",
+             f"> 导出时间：{_now('%Y-%m-%d %H:%M')}　消息数：{len(sess.get('messages', []))}",
              ""]
     for m in sess.get("messages", []):
         who = "🙋 用户" if m["role"] == "user" else "🤖 湘小狮"
@@ -739,7 +800,7 @@ def page_chat():
     deep = ss["deep_think"]
     msgs.append(f'<div class="chip-row">{chips}</div>')
     # 输入行直接内嵌（原生 form GET 提交到顶层窗口，无需 JS 导航，重渲染不丢失）
-    ts_now = int(time.time() * 1000)
+    ts_now = int(datetime.now(_CST).timestamp() * 1000)
     msgs.append(
         '<div class="in-row">'
         '<form id="askForm" method="GET" action="/" target="_top" autocomplete="off">'
@@ -772,7 +833,7 @@ def page_chat():
         f'<span class="hdr-acts">'
         f'<button type="button" class="new-chat" id="expBtn" title="导出当前会话为 Markdown 文件" '
         f'data-exp="{exp_b64}" data-name="{_esc(exp_name)}.md">⬇️ 导出</button>'
-        f'<a class="new-chat" href="{url("AI对话", nts=int(time.time() * 1000))}">＋ 新对话</a>'
+        f'<a class="new-chat" href="{url("AI对话", nts=int(datetime.now(_CST).timestamp() * 1000))}">＋ 新对话</a>'
         f'</span></div>'
         f'{_sess_list_html()}'
         f'</div>'

@@ -10,21 +10,30 @@ from typing import TypedDict, List
 from retriever import search_test
 from skills_tools import query_scholarship, query_discipline, get_policy_time
 
-load_dotenv()
-api_key = os.getenv("ZHIPU_API_KEY")
-# Streamlit 云端部署兜底：环境变量缺失时从 st.secrets 读取
-if not api_key:
+
+def _get_api_key():
+    """按优先级找 API Key：.env 环境变量 → Streamlit secrets（云端部署）"""
+    load_dotenv()
+    k = os.getenv("ZHIPU_API_KEY")
+    if k:
+        return k
     try:
         import streamlit as _st
-        api_key = _st.secrets.get("ZHIPU_API_KEY")
+        k = _st.secrets.get("ZHIPU_API_KEY")
     except Exception:
         pass
+    return k
 
-model = ChatZhipuAI(
-    model="glm-4-flash",
-    api_key=api_key,
-    temperature=0.1
-)
+
+# ========== 延迟创建模型（避开 import 时 st.secrets 还没初始化的问题） ==========
+_MODEL = None
+def _get_model():
+    global _MODEL
+    if _MODEL is None:
+        api_key = _get_api_key()
+        _MODEL = ChatZhipuAI(model="glm-4-flash", api_key=api_key, temperature=0.1)
+    return _MODEL
+
 
 class AgentState(TypedDict):
     question: str
@@ -55,7 +64,7 @@ def classify_intent(state: AgentState):
     用户最新问题：{state["question"]}
     判断属于哪个类别，只输出一个词：policy / major / news / chat
     """
-    response = model.invoke(prompt)
+    response = _get_model().invoke(prompt)
     intent = response.content.strip().lower()
     thinking.append(f"   → 判断为：{intent}")
     
@@ -107,7 +116,7 @@ def retrieve_news(state: AgentState):
 def direct_answer(state: AgentState):
     thinking = state.get("thinking_steps", [])
     thinking.append("💬 直接回答（无需检索）")
-    response = model.invoke(f"请友好地回答用户：{state['question']}")
+    response = _get_model().invoke(f"请友好地回答用户：{state['question']}")
     thinking.append("   → 回答已生成")
     return {
         "answer": response.content,
@@ -175,7 +184,7 @@ def generate_answer(state: AgentState):
     5. 不要在没有理解指代的情况下，做出泛泛的回答
     """    # ===================================================
     
-    response = model.invoke(prompt)
+    response = _get_model().invoke(prompt)
     thinking.append("   → 回答已生成")
     
     return {

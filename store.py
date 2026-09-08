@@ -7,21 +7,27 @@
 """
 import json
 import os
-import time
 import uuid
+from datetime import datetime, timezone, timedelta
 
 ROOT = os.path.dirname(os.path.abspath(__file__))
 CHAT_DIR = os.path.join(ROOT, "data", "chat_store")
 os.makedirs(CHAT_DIR, exist_ok=True)
 
 DEFAULT_PROFILE = {"nickname": "张同学", "sid": "2023010301", "role": "本科生", "avatar": ""}
+# 北京时间（UTC+8），云端服务器时区独立于用户
+_CST = timezone(timedelta(hours=8))
+
+
+def _now():
+    return datetime.now(_CST)
 
 
 def new_session():
     return {"id": uuid.uuid4().hex[:8],
             "title": "新对话",
-            "created": time.strftime("%Y-%m-%d %H:%M"),
-            "day": time.strftime("%Y-%m-%d"),
+            "created": _now().strftime("%Y-%m-%d %H:%M"),
+            "day": _now().strftime("%Y-%m-%d"),
             "messages": [],
             "hits": []}
 

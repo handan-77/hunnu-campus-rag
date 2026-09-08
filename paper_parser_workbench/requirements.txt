@@ -1,0 +1,19 @@
+# 学术文献解析与报告生成系统依赖清单
+# 使用方法: pip install -r requirements.txt
+
+# Web UI 框架
+streamlit>=1.28.0
+
+# 文档解析
+pdfplumber>=0.10.0
+python-docx>=1.0.0
+
+# 中文分词
+jieba>=0.42.1
+
+# 可视化
+wordcloud>=1.9.0
+matplotlib>=3.7.0
+
+# 数据处理
+pandas>=2.0.0
