@@ -100,31 +100,54 @@ def _cur():
 view = unquote_plus(qp.get("view", "首页"))
 if view not in VIEWS:
     view = "首页"
-if qp.get("deep") in ("0", "1"):                       # 深度思考开关
+
+# —— 操作类参数：读、处理、主动清理（避免 Streamlit rerun 时重复触发或 URL 残留） ——
+_OP_PARAMS = ["pin", "del", "ren", "nts", "clear", "ask", "rtitle", "rsid", "ts", "deep", "sid"]
+
+def _clean_op_params():
+    """处理完操作类参数后主动从 URL 里删掉它们"""
+    try:
+        for p in _OP_PARAMS:
+            if p in qp:
+                del qp[p]
+    except Exception:
+        pass
+
+# deep 开关
+if qp.get("deep") in ("0", "1"):
     ss["deep_think"] = qp.get("deep") == "1"
-sid = qp.get("sid")                                    # 切换历史会话
+
+# 切换会话
+sid = qp.get("sid")
 if sid and sid != ss["cur_sid"] and store.get_session(ss["store"], sid):
     ss["cur_sid"] = sid
-nts = qp.get("nts")                                    # 新建对话（带时间戳防重复）
-if nts and nts != ss["last_nts"]:
+
+# 新建对话
+nts = qp.get("nts")
+if nts and nts != ss.get("last_nts"):
     ss["last_nts"] = nts
     s = store.new_session()
     ss["store"]["sessions"].append(s)
     ss["cur_sid"] = s["id"]
     store.save(ss["user_id"], ss["store"])
-if qp.get("clear") == "1":                             # 清空当前会话（幂等）
+
+# 清空当前会话
+if qp.get("clear") == "1":
     _cur()["messages"] = []
     _cur()["hits"] = []
     ss["last_hits"] = []
     store.save(ss["user_id"], ss["store"])
-svc = qp.get("svc")                                    # 服务页自动展开表单（集合记录，提交后不收起）
+
+# 服务页自动展开表单
+svc = qp.get("svc")
 if svc:
     ss.setdefault("svc_open", set()).add(svc)
+
 if qp.get("logout") == "1" and not ss["_logout_toast"]:
     st.toast("已退出登录（演示环境）")
     ss["_logout_toast"] = True
 
-# —— 会话管理：置顶 / 删除 / 重命名（pin 带时间戳防重复切换） ——
+# 会话管理：置顶
 pin = qp.get("pin")
 if pin and pin != ss.get("last_pin"):
     ss["last_pin"] = pin
@@ -135,30 +158,39 @@ if pin and pin != ss.get("last_pin"):
     else:
         pinned.append(pid)
     store.save(ss["user_id"], ss["store"])
+
+# 删除会话
 _del = qp.get("del")
 if _del and store.get_session(ss["store"], _del):
     ss["store"]["sessions"] = [x for x in ss["store"]["sessions"] if x["id"] != _del]
     if _del in ss["store"].get("pinned", []):
         ss["store"]["pinned"].remove(_del)
-    if ss["cur_sid"] == _del:                          # 删除的是当前会话 → 新开一条
+    if ss["cur_sid"] == _del:
         _ns = store.new_session()
         ss["store"]["sessions"].append(_ns)
         ss["cur_sid"] = _ns["id"]
     store.save(ss["user_id"], ss["store"])
-_rtitle = qp.get("rtitle")                             # 重命名提交（内联表单）
+
+# 重命名提交
+_rtitle = qp.get("rtitle")
 _rsid = qp.get("rsid")
 if _rtitle and _rsid:
     _s = store.get_session(ss["store"], _rsid)
     if _s:
         _s["title"] = _rtitle.strip()[:30] or _s["title"]
         store.save(ss["user_id"], ss["store"])
-_ren = qp.get("ren")                                   # 进入重命名状态；URL 无 ren 时退出（取消/切换/提交后均清除）
+
+# 进入重命名状态
+_ren = qp.get("ren")
 ss["ren_sid"] = _ren if (_ren and store.get_session(ss["store"], _ren)) else None
 
 
 def url(v, **params):
-    """构造交互链接"""
+    """构造交互链接——自动带上 uid 保持会话身份"""
     q = {"view": v}
+    # 自动附加 uid，保证所有导航/操作都在同一用户会话内
+    if ss.get("user_id"):
+        q["uid"] = ss["user_id"]
     q.update(params)
     return "/?" + "&".join(f"{k}={quote(str(val))}" for k, val in q.items() if val is not None)
 
@@ -1106,3 +1138,6 @@ elif view == "校园服务":
     page_services()
 else:
     page_profile()
+
+# —— 所有页面渲染完后，主动清理操作类 URL 参数（只留 view + uid + svc） ——
+_clean_op_params()
